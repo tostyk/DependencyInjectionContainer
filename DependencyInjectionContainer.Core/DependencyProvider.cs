@@ -92,18 +92,16 @@ namespace DependencyInjectionContainer.Core
                 List<object> parameters = new List<object>();
                 foreach (ParameterInfo parameterInfo in parametersInfo)
                 {
-                    if (_config.ConfigElements.Any(e => e.DependencyType == parameterInfo.ParameterType ||
-                        parameterInfo.ParameterType.IsSubclassOf(e.ImplementationType) ||
-                        e.ImplementationType.GetInterfaces().Contains(parameterInfo.ParameterType)))
+                    if (_config.ConfigElements.Any(e => e.DependencyType == parameterInfo.ParameterType))
                     {
                         parameters.Add(Resolve(parameterInfo.ParameterType));
                     }
                     else
                     {
-                        object obj = default;
+                        object? obj = default;
                         try
                         {
-                            obj = Activator.CreateInstance(parameterInfo.ParameterType, null);
+                            obj = Activator.CreateInstance(parameterInfo.ParameterType);
                         }
                         catch { }
                         parameters.Add(obj);
