@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Reflection;
-using System.Xml.Linq;
 
 namespace DependencyInjectionContainer.Core
 {
@@ -76,13 +74,62 @@ namespace DependencyInjectionContainer.Core
             else
             {
                 var element = _config.ConfigElements.Find(e => e.DependencyType.Name == type.Name);
-                result = GetImplementation(element);
+                Type[] args = new Type[] { };
+                if (element.ImplementationType.IsGenericTypeDefinition &&
+                element.ImplementationType.IsGenericType &&
+                element.ImplementationType.GetGenericArguments().First().FullName == null)
+                {
+                    args = type.GetGenericArguments();
+                }
+                result = GetImplementation(element, args);
             }
 
             while (!_dependensiesStack.TryPop(out type)) { }
             return result;
         }
-
+        private IEnumerable<object> GetEnumerableWith(Type type)
+        {
+            IEnumerable<object> objects = new List<object>();
+            var elements = _config.ConfigElements.FindAll(e => e.DependencyType == type);
+            foreach (ConfigElement element in elements)
+            {
+                Type[] args = new Type[] { };
+                if (element.ImplementationType.IsGenericTypeDefinition &&
+                element.ImplementationType.IsGenericType &&
+                element.ImplementationType.GetGenericArguments().First().FullName == null)
+                {
+                    args = type.GetGenericArguments();
+                }
+                objects = objects.Append(GetImplementation(element, args));
+            }
+            return objects;
+        }
+        private object GetImplementation(ConfigElement element, Type[] args)
+        {
+            if (args.Length > 0)
+            {
+                if (element.LifeTime == LifeTime.Singleton)
+                {
+                    if (_singletones.ContainsKey(element))
+                        return _singletones[element];
+                }
+                else
+                {
+                    var genericType = element.ImplementationType.MakeGenericType(args);
+                    return CreateInstance(genericType);
+                }
+            }
+            if (element.LifeTime == LifeTime.Singleton)
+            {
+                if (!_singletones.ContainsKey(element))
+                    while (!_singletones.TryAdd(element, CreateInstance(element.ImplementationType))) { }
+                return _singletones[element];
+            }
+            else
+            {
+                return CreateInstance(element.ImplementationType);
+            }
+        }
         private object CreateInstance(Type type)
         {
             var constructors = type.GetConstructors();
@@ -109,51 +156,11 @@ namespace DependencyInjectionContainer.Core
                 }
                 try
                 {
-                    return constructors[0].Invoke(parameters.ToArray());
+                    return Activator.CreateInstance(type, parameters.ToArray());
                 }
                 catch { }
             }
             return default;
-        }
-        private object GetImplementation(ConfigElement element)
-        {
-            if (element.ImplementationType.IsGenericTypeDefinition &&
-                element.ImplementationType.IsGenericType &&
-                element.ImplementationType.GetGenericArguments().First().FullName == null)
-            {
-                if (element.LifeTime == LifeTime.Singleton)
-                {
-                    if (!_singletones.ContainsKey(element))
-                        _singletones.TryAdd(element, CreateInstance(element.ImplementationType));
-                    return _singletones[element];
-                }
-                else
-                {
-                    var genericType = element.ImplementationType.MakeGenericType(element.DependencyType.GetGenericArguments());
-                    return CreateInstance(genericType);
-                }
-            }
-            if (element.LifeTime == LifeTime.Singleton)
-            {
-                if (!_singletones.ContainsKey(element))
-                    while (!_singletones.TryAdd(element, CreateInstance(element.ImplementationType))) { }
-                return _singletones[element];
-            }
-            else
-            {
-                return CreateInstance(element.ImplementationType);
-            }
-        }
-
-        private IEnumerable<object> GetEnumerableWith(Type type)
-        {
-            IEnumerable<object> objects = new List<object>();
-            var elements = _config.ConfigElements.FindAll(e => e.DependencyType == type);
-            foreach (ConfigElement element in elements)
-            {
-                objects = objects.Append(GetImplementation(element));
-            }
-            return objects;
         }
     }
 }

@@ -33,11 +33,11 @@ namespace DependencyInjectionContainer.Tests
         public IRepository Repository { get; set; }
     }
 
-    class ServiceImpl<RepositoryImpl> : IService<RepositoryImpl>
-        where RepositoryImpl : IRepository
+    class ServiceImpl<TRepository> : IService<TRepository>
+        where TRepository : IRepository
     {
         public IRepository Repository { get; set; }
-        public ServiceImpl(RepositoryImpl repository)
+        public ServiceImpl(IRepository repository)
         {
             Repository = repository;
         }
